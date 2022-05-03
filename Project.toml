@@ -14,6 +14,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 [compat]
 DataFrames = "1"
 GraphQLClient = "0.7"
+JuliaFormatter = "0.22"
 Revise = "3"
 Roots = "1, 2"
 julia = "1.7"
