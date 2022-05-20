@@ -12,6 +12,7 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 
 [compat]
+CSV = "0.10"
 GraphQLClient = "0.7"
 Revise = "3"
 Roots = "1, 2"
