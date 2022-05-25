@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.9.0](https://github.com/graphprotocol/AllocationOpt.jl/compare/v1.8.0...v1.9.0) (2022-05-25)
+
+
+### Features
+
+* configurable network subgraph endpoint ([48c6d1c](https://github.com/graphprotocol/AllocationOpt.jl/commit/48c6d1c84b358780127052d5e05c04880101dec6))
+
 # [1.8.0](https://github.com/graphprotocol/AllocationOpt.jl/compare/v1.7.1...v1.8.0) (2022-05-24)
 
 
