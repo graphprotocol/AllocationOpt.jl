@@ -96,15 +96,40 @@ function query_indexers(client::Client, subgraphs::AbstractVector{SubgraphDeploy
             "id",
             "delegatedTokens",
             "stakedTokens",
+            "indexingRewardCut",
             "allocations($allocations_query){allocatedTokens,createdAtEpoch,subgraphDeployment{ipfsHash}}",
         ],
     )
     indexers_data = query(client, "indexers"; query_args=indexer_query.args, output_fields=indexer_query.fields).data["indexers"]
     indexers = map(
-        x -> Indexer(x["id"], x["delegatedTokens"], x["stakedTokens"], x["allocations"]),
+        x -> Indexer(x["id"], x["delegatedTokens"], x["stakedTokens"], x["allocations"], x["indexingRewardCut"]),
         indexers_data,
     )
     return indexers
+end
+
+function networkparameters(client:: Client, network_id::Integer)
+    network_query = GQLQuery(
+        Dict("id" => network_id),
+        [
+            "id",
+            "totalSupply",
+            "networkGRTIssuance",
+            "epochLength",
+            "totalTokensSignalled",
+            "currentEpoch",
+        ],
+    )
+    network_data = query(client, "graphNetwork"; query_args=network_query.args, output_fields=network_query.fields).data["graphNetwork"]
+    network = GraphNetworkParameters(
+        network_data["id"],
+        network_data["totalSupply"],
+        network_data["networkGRTIssuance"],
+        network_data["epochLength"],
+        network_data["totalTokensSignalled"],
+        network_data["currentEpoch"],
+    )
+    return network
 end
 
 function snapshot(

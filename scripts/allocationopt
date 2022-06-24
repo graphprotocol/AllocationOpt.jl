@@ -9,21 +9,22 @@ Optimises an indexer's allocations and pushes them to the action queue.
 
 - `id`: The id of the indexer to optimise.
 - `filepath`: A path to the CSV file that contains whitelist, blacklist, pinnedlist, frozenlist as columns.
-- `grtgas`: The maximum amount of GRT that you are willing to spend on each allocation transaction.
 - `minimum_allocation_amount`: The minimum amount of GRT that you are willing to allocate to a subgraph.
 - `maximum_new_allocations`: The maximum number of new allocations you would like the optimizer to open.
+- `grtgas`: The maximum amount of GRT that you are willing to spend on each allocation transaction.
+- `allocation_lifetime::Integer`: The number of epochs for which these allocations would be open. An allocation earns indexing rewards upto 28 epochs.
 - `management_server_url`: The URL that exposes the indexer managment server, including the port. Must begin with http. Example: http://localhost:18000.
 - `indexer_service_network_url`: The URL that exposes the indexer service's network endpoint. Must begin with http. Example: http://localhost:7600/network.
 """
-@cast function actionqueue(id, filepath, minimum_allocation_amount, maximum_new_allocations, management_server_url, indexer_service_network_url)
+@cast function actionqueue(id, filepath, minimum_allocation_amount, maximum_new_allocations, grtgas, allocation_lifetime, management_server_url, indexer_service_network_url)
     # Read subgraph lists defined in the file
     cols = read_filterlists(filepath)
 
     # Pull network state from indexer service network endpoint
-    indexer, repo = network_state(id, cols..., indexer_service_network_url)
+    indexer, repo, network = network_state(id, cols..., indexer_service_network_url)
 
     # Optimize for the indexer
-    ω = optimize_indexer(repo, indexer, parse(Float64, minimum_allocation_amount), parse(Int64, maximum_new_allocations))
+    ω = optimize_indexer(repo, indexer, network, parse(Float64, minimum_allocation_amount), parse(Int64, maximum_new_allocations), parse(Float64, grtgas), parse(Int64, allocation_lifetime), cols[3])
     
     # Push results to action queue
     _ = push_allocations!(id, management_server_url, indexer_service_network_url, ω, cols...)
@@ -40,20 +41,21 @@ Optimises an indexer's allocations and generates indexer rules to change allocat
 
 - `id`: The id of the indexer to optimise.
 - `filepath`: A path to the CSV file that contains whitelist, blacklist, pinnedlist, frozenlist as columns.
-- `grtgas`: The maximum amount of GRT that you are willing to spend on each allocation transaction.
 - `minimum_allocation_amount`: The minimum amount of GRT that you are willing to allocate to a subgraph.
 - `maximum_new_allocations`: The maximum number of new allocations you would like the optimizer to open.
+- `grtgas`: The maximum amount of GRT that you are willing to spend on each allocation transaction.
+- `allocation_lifetime::Integer`: The number of epochs for which these allocations would be open. An allocation earns indexing rewards upto 28 epochs.
 - `indexer_service_network_url`: The URL that exposes the indexer service's network endpoint. Must begin with http. Example: http://localhost:7600/network.
 """
-@cast function rules(id, filepath, minimum_allocation_amount, maximum_new_allocations, indexer_service_network_url)
+@cast function rules(id, filepath, minimum_allocation_amount, maximum_new_allocations, grtgas, allocation_lifetime, indexer_service_network_url)
     # Read subgraph lists defined in the file
     cols = read_filterlists(filepath)
 
     # Pull network state from indexer service network endpoint
-    indexer, repo = network_state(id, cols..., indexer_service_network_url)
+    indexer, repo, network = network_state(id, cols..., indexer_service_network_url)
 
     # Optimize for the indexer
-    ω = optimize_indexer(repo, indexer, parse(Float64, minimum_allocation_amount), parse(Int64, maximum_new_allocations))
+    ω = optimize_indexer(repo, indexer, network, parse(Float64, minimum_allocation_amount), parse(Int64, maximum_new_allocations), parse(Float64, grtgas), parse(Int64, allocation_lifetime), cols[3])
 
     # Create indexer rules
     indexer_rules = create_rules!(id, indexer_service_network_url, ω, cols...)

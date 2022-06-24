@@ -22,7 +22,6 @@ include("CLI.jl")
 - `pinnedlist::Vector{AbstractString}`: Subgraph deployment IPFS hashes included in this list will be guaranteed allocation. Currently unsupported.
 - `frozenlist::Vector{AbstractString}`: Subgraph deployment IPFS hashes included in this list will not be considered during optimisation. Any allocations you have on these subgraphs deployments will remain.
 - `indexer_service_network_url::AbstractString`: The URL that exposes the indexer service's network endpoint. Must begin with http. Example: http://localhost:7600/network.
-
 """
 function network_state(
     id::AbstractString,
@@ -48,7 +47,10 @@ function network_state(
     client = Client(indexer_service_network_url)
 
     # Pull data from mainnet subgraph
+    # TODO: Parameterise network_id
+    network_id = 1
     repo = snapshot(client, query_ipfshash_in, query_ipfshash_not_in)
+    network = networkparameters(client, network_id)
 
     # Handle frozenlist
     # Get indexer
@@ -56,8 +58,8 @@ function network_state(
 
     # Reduce indexer stake by frozenlist
     fstake = frozen_stake(client, id, frozenlist)
-    indexer = Indexer(indexer.id, indexer.stake - fstake, indexer.allocations)
-    return repo, indexer
+    indexer = Indexer(indexer.id, indexer.stake - fstake, indexer.allocations, indexer.cut)
+    return repo, indexer, network
 end
 
 """
@@ -66,28 +68,47 @@ end
 # Arguments
 - `indexer::Indexer`: The indexer being optimised.
 - `repo::Repository`: Contains the current network state.
+- `network::GraphNetworkParameters`: Contains the current network parameters.
 - `minimum_allocation_amount::Real`: The minimum amount of GRT that you are willing to allocate to a subgraph.
 - `maximum_new_allocations::Integer`: The maximum number of new allocations you would like the optimizer to open.
+- `gas::Float64`: The gas in grt that the indexer will spend on the allocation transaction. We use this to
+    calculate profit, but note that the assumption that this will be the price at the end of the allocation
+    lifetime is probably bad. Gas is constantly changing.
+- `allocation_lifetime::Integer`: The number of epochs for which these allocations would be open. An allocation earns indexing rewards upto 28 epochs.
+- `pinnedlist::Vector{AbstractString}`: Subgraph deployment IPFS hashes included in this list will be guaranteed allocation. Pinnedlist allocations will be at least 0.1 GRT.
 ```
 """
 function optimize_indexer(
     indexer::Indexer,
     repo::Repository,
+    network::GraphNetworkParameters,
     minimum_allocation_amount::Real,
     maximum_new_allocations::Integer,
+    gas::Float64,
+    allocation_lifetime::Integer,
+    pinnedlist::AbstractVector{<:AbstractString},
 )
-    @warn "maximum_new_allocations is not currently optimised for."
-    @warn "minimum_allocation_amount is not currently optimised for."
+    
+    max_allocation_lifetime = 28
+    # TODO: Test
+    if allocation_lifetime > max_allocation_lifetime &&
+        allocation_lifetime < 0
+        throw(InvalidAllocationLifetime())
+    end
 
     # Optimise
-    # ω = optimize(indexer, repo, maximum_new_allocations, minimum_allocation_amount)
-    ω = optimize(indexer, repo)
+    ωopt = optimize(indexer, repo)
+    pinned_ixs::Vector{Int64} = findall(x -> x in pinnedlist, repo.subgraphs)
+    ω = optimize(indexer, repo, ωopt, maximum_new_allocations, minimum_allocation_amount, network, gas, allocation_lifetime, pinned_ixs)
 
     # Filter results with deployment IPFS hashes
     suggested_allocations = Dict(
         ipfshash(k) => v for (k, v) in zip(repo.subgraphs, ω) if v > 0.0
     )
 
+    # @show ωopt
+    @show nonzero(ωopt)
+    @show nonzero(ω)
     return suggested_allocations
 end
 
@@ -179,7 +200,9 @@ function create_rules!(
     existing_allocations = query_indexer_allocations(
         Client(indexer_service_network_url), indexer_id
     )
-    existing_allocs::Dict{String,String} = Dict(ipfshash.(existing_allocations) .=> id.(existing_allocations))
+    existing_allocs::Dict{String,String} = Dict(
+        ipfshash.(existing_allocations) .=> id.(existing_allocations)
+    )
     existing_ipfs::Vector{String} = ipfshash.(existing_allocations)
     proposed_ipfs::Vector{String} = collect(keys(proposed_allocations))
 
