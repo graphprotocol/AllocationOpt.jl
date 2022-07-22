@@ -18,6 +18,7 @@ SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [compat]
 GraphQLClient = "0.7"
+ProgressMeter = "1"
 Revise = "3"
 Roots = "1, 2"
 julia = "1.7"
